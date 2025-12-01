@@ -24,10 +24,22 @@ const ret = input
   .reduce(
     ({ pos, count }, { direction, value }) => {
       const op = directionOp[direction];
-      const newPos = normalize(op(pos, value));
+      const rawValue = op(pos, value);
+      const newPos = normalize(rawValue);
+      const atZeroCount = newPos === 0 ? 1 : 0;
+      const pastZeroCount =
+        rawValue < 0
+          ? Math.ceil(Math.abs(rawValue / 100)) -
+            // avoid over-counting when we start on zero
+            (pos === 0 ? 1 : 0)
+          : rawValue > 100
+            ? Math.floor(rawValue / 100) -
+              // avoid over-counting when we end on zero
+              (newPos === 0 ? 1 : 0)
+            : 0;
       return {
         pos: newPos,
-        count: newPos === 0 ? count + 1 : count,
+        count: count + atZeroCount + pastZeroCount,
       };
     },
     { pos: start, count: 0 },
