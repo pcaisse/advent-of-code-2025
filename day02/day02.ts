@@ -1,5 +1,13 @@
-function invalid(s: string) {
-  return s.slice(0, s.length / 2) === s.slice(s.length / 2, s.length);
+function invalid(x: number): boolean {
+  const s = String(x);
+  for (let i = 1; i <= Math.floor(s.length / 2); i++) {
+    const pattern = s.substring(0, i);
+    const n = Math.floor(s.length / pattern.length);
+    if (pattern.repeat(n) === s) {
+      return true;
+    }
+  }
+  return false;
 }
 
 const input = await Bun.stdin.text();
@@ -8,7 +16,7 @@ const ret = input
   .split(",")
   .flatMap((s) => {
     const [start, end] = s.split("-").map(Number) as [number, number];
-    return [...Array(end - start + 1)].map((_, i) => String(i + start));
+    return [...Array(end - start + 1)].map((_, i) => i + start);
   })
   .filter(invalid)
   .map(Number)
