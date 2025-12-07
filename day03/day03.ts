@@ -14,8 +14,16 @@ function formatBatteries(batteries: Battery[]) {
   return batteries.map(({ value }) => String(value)).join("");
 }
 
+function unskipped(batteries: Battery[]) {
+  return batteries.filter(({ skip }) => !skip);
+}
+
 function processBatteries(batteries: Battery[]): Battery[] {
   let remainingSkips = batteries.length - numDigits;
+
+  if (remainingSkips === 0) {
+    return unskipped(batteries);
+  }
 
   const skipBattery = (
     battery: Battery,
@@ -32,48 +40,30 @@ function processBatteries(batteries: Battery[]): Battery[] {
       );
     }
     battery.skip = true;
-    remainingSkips--;
   };
 
   for (let i = 0; i < batteries.length; i++) {
     const currBattery = batteries[i];
     const prevBattery = batteries[i - 1];
     if (
-      remainingSkips > 0 &&
       currBattery &&
       prevBattery &&
       !prevBattery.skip &&
-      currBattery.value >= prevBattery.value
+      currBattery.value > prevBattery.value
     ) {
       skipBattery(prevBattery, "regular", currBattery);
-      // TODO: Figure out issue with "backwards skipping" where fixing up skips that result from
-      // non-immediate repeated number (sequences of numbers that become repeated after other
-      // numbers are skipped) are not handled correctly.
-      for (let j = i - 1; j >= 0; j--) {
-        const pastBattery = batteries[j];
-        if (
-          remainingSkips > 0 &&
-          pastBattery &&
-          !pastBattery.skip &&
-          currBattery.value > pastBattery.value
-        ) {
-          skipBattery(pastBattery, "past", currBattery);
-        }
-      }
+      const newBatteries = unskipped(batteries);
+      return processBatteries(newBatteries);
     }
   }
-  return batteries.filter(({ skip }) => !skip);
+  return unskipped(batteries);
 }
 
 function findLargestJoltage(batteries: Battery[]): number {
-  const ret = processBatteries(batteries);
+  const ret = processBatteries(batteries).slice(0, numDigits);
 
-  const unskippedBatteries = batteries.filter(({ skip }) => !skip);
-  if (unskippedBatteries.length !== numDigits) {
-    console.log("unskippedBatteries", formatBatteries(unskippedBatteries));
-    throw new Error(
-      `unskippedBatteries has incorrect length of ${unskippedBatteries.length}`,
-    );
+  if (ret.length !== numDigits) {
+    throw new Error(`has incorrect length of ${ret.length}`);
   }
 
   return Number(formatBatteries(ret));
