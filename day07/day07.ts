@@ -34,50 +34,54 @@ function moveDownOneRow(pos: Position): Position {
 const serializePos = (pos: Position): string => JSON.stringify(pos);
 const deserializePos = (s: string): Position => JSON.parse(s);
 
-function walk(
-  beamPositions: Set<string>,
-  splitterPositions: Set<string>,
-  rowIndex: number,
-  numRows: number,
-  numSplits: number,
-): number {
-  const currentBeamPositions = new Set<string>(beamPositions);
-  currentBeamPositions.forEach((beamPos) => {
-    const nextBeamPos = serializePos(moveDownOneRow(deserializePos(beamPos)));
-    if (deserializePos(nextBeamPos)[0] !== rowIndex) {
-      // Only consider beams on this row
-      return;
-    }
-    if (splitterPositions.has(nextBeamPos)) {
-      // Beam hit splitter, need to split!
-      beamPositions.add(
-        serializePos(moveLeftOneCol(deserializePos(nextBeamPos))),
-      );
-      beamPositions.add(
-        serializePos(moveRightOneCol(deserializePos(nextBeamPos))),
-      );
-      numSplits++;
+function memoize(fn: (...args: any[]) => any) {
+  const cache = new Map();
+  return function (...args: any[]) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return JSON.parse(cache.get(key));
     } else {
-      // Beam continues downward one more row
-      beamPositions.add(nextBeamPos);
+      const result = fn(...args);
+      cache.set(key, result);
+      return result;
     }
-  });
-  if (rowIndex === numRows) {
-    return numSplits;
-  }
-  return walk(
-    beamPositions,
-    splitterPositions,
-    rowIndex + 1,
-    numRows,
-    numSplits,
-  );
+  };
 }
 
-const startBeams = new Set<string>([serializePos(moveDownOneRow(start))]);
-const startSplitters = new Set<string>(
+function walk() {
+  const cachedWalk = memoize(
+    (beamPosition: string, rowIndex: number): number => {
+      if (rowIndex === numRows) {
+        return 1;
+      }
+      const nextBeamPos = serializePos(
+        moveDownOneRow(deserializePos(beamPosition)),
+      );
+      const nextRowIndex = rowIndex + 1;
+      const splitterWasHit =
+        splitterPositions.has(nextBeamPos) &&
+        deserializePos(nextBeamPos)[0] === nextRowIndex;
+      const newLeftBeamPos = serializePos(
+        moveLeftOneCol(deserializePos(nextBeamPos)),
+      );
+      const newRightBeamPos = serializePos(
+        moveRightOneCol(deserializePos(nextBeamPos)),
+      );
+      return splitterWasHit
+        ? // Beam hit splitter, need to split!
+          cachedWalk(newLeftBeamPos, nextRowIndex) +
+            cachedWalk(newRightBeamPos, nextRowIndex)
+        : // Beam continues downward one more row
+          cachedWalk(nextBeamPos, nextRowIndex);
+    },
+  );
+  return cachedWalk;
+}
+
+const startBeam: string = serializePos(moveDownOneRow(start));
+const splitterPositions = new Set<string>(
   splitters.map((value) => serializePos(value)),
 );
 
-const numSplits = walk(startBeams, startSplitters, 1, numRows, 0);
-console.log(numSplits);
+const numTimelines = walk()(startBeam, 1);
+console.log(numTimelines);
